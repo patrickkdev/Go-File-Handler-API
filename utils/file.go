@@ -4,7 +4,27 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
+
+const ROOT = "storage-root"
+
+func ReplaceSpecialChars(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+			if !isASCII(r) {
+					// Replace special characters
+					result.WriteByte(byte(r))
+			} else {
+					result.WriteRune(r)
+			}
+	}
+	return result.String()
+}
+
+func isASCII(r rune) bool {
+	return r <= unicode.MaxASCII
+}
 
 // FolderStructure represents a folder structure
 type FolderStructure struct {
@@ -63,32 +83,35 @@ func Remove(path string, force bool) error {
 	return nil
 }
 
+func Rename(oldPath string, newPath string) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetFolderStructure(path string) (*FolderStructure, error) {
+	formatPath := func(path string) string {
+		pathWithReplacedBackslashes := strings.ReplaceAll(path, "\\", "/")
+		pathWithoutRoot := strings.ReplaceAll(pathWithReplacedBackslashes, ROOT, "")
+
+		return pathWithoutRoot
+	}
+	
 	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if err != nil {
 		return nil, err
 	}
 
-	if !info.IsDir() {
-		return &FolderStructure{
-			Name:   filepath.Base(path),
-			Path:   path,
-			IsFile: true,
-		}, nil
-	}
-
-	return buildFolderStructure(path)
-}
-
-func buildFolderStructure(path string) (*FolderStructure, error) {
 	root := &FolderStructure{
 		Name:     filepath.Base(path),
-		Path:     path,
-		IsFile:   false,
+		Path:     formatPath(path),
+		IsFile:   !info.IsDir(),
 		Children: []*FolderStructure{},
 	}
 
-	err := filepath.Walk(path, func(subpath string, info os.FileInfo, err error) error {
+	err = filepath.Walk(path, func(subpath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -120,7 +143,7 @@ func buildFolderStructure(path string) (*FolderStructure, error) {
 			if !found {
 				child := &FolderStructure{
 					Name:     segment,
-					Path:     relativePath,
+					Path:     formatPath(subpath),
 					IsFile:   false,
 					Children: []*FolderStructure{},
 				}
