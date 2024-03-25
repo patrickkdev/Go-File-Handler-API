@@ -9,6 +9,7 @@ import (
 // FolderStructure represents a folder structure
 type FolderStructure struct {
 	Name     string            `json:"name"`
+	Path     string            `json:"path"`
 	IsFile   bool              `json:"isFile"`
 	Children []*FolderStructure `json:"children,omitempty"`
 }
@@ -46,6 +47,22 @@ func MkdirAll(path string) error {
 	return nil
 }
 
+func Remove(path string, force bool) error {
+	var err error
+
+	if force {
+		err = os.RemoveAll(path)
+	} else {
+		err = os.Remove(path)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetFolderStructure(path string) (*FolderStructure, error) {
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
@@ -55,6 +72,7 @@ func GetFolderStructure(path string) (*FolderStructure, error) {
 	if !info.IsDir() {
 		return &FolderStructure{
 			Name:   filepath.Base(path),
+			Path:   path,
 			IsFile: true,
 		}, nil
 	}
@@ -65,6 +83,7 @@ func GetFolderStructure(path string) (*FolderStructure, error) {
 func buildFolderStructure(path string) (*FolderStructure, error) {
 	root := &FolderStructure{
 		Name:     filepath.Base(path),
+		Path:     path,
 		IsFile:   false,
 		Children: []*FolderStructure{},
 	}
@@ -101,6 +120,7 @@ func buildFolderStructure(path string) (*FolderStructure, error) {
 			if !found {
 				child := &FolderStructure{
 					Name:     segment,
+					Path:     relativePath,
 					IsFile:   false,
 					Children: []*FolderStructure{},
 				}
@@ -110,11 +130,7 @@ func buildFolderStructure(path string) (*FolderStructure, error) {
 			}
 		}
 
-		if info.IsDir() {
-			currentNode.IsFile = false
-		} else {
-			currentNode.IsFile = true
-		}
+		currentNode.IsFile = !info.IsDir()
 
 		return nil
 	})
