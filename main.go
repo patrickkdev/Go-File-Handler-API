@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
