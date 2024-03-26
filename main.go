@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	fileUtils "github.com/patrickkdev/go-file-handler/utils"
 )
 
@@ -12,11 +13,11 @@ func main() {
 	app := fiber.New()
 	app.Server().MaxRequestBodySize = 1073741824
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		c.Status(200).SendString("Hi, mom!")
-
-		return nil
-	})
+	// Logger Middleware
+	app.Use(logger.New(logger.Config{
+		// Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
+		Format: "${method} ${path} - ${status}\n",
+	}))
 
 	app.Get("/*/download", handleDownload)
 	app.Get("/*", handleGetFolderStructure)
@@ -27,7 +28,7 @@ func main() {
 
 	app.Delete("/*", handleDelete)
 
-	app.Listen("localhost:3011")
+	app.Listen(":9990")
 }
 
 func formatPath(path string) string {
@@ -59,18 +60,25 @@ func handleUpload(c *fiber.Ctx) error {
 }
 
 func handleDownload(c *fiber.Ctx) error {
-	filePath := formatPath(c.Params("*"))
+    filePath := formatPath(c.Params("*"))
 
-	isFile, err := fileUtils.FileIsFile(filePath)
-	if err != nil {
-		return c.Status(500).SendString("Error checking file: " + err.Error())
-	}
+    isFile, err := fileUtils.FileIsFile(filePath)
+    if err != nil {
+        return c.Status(http.StatusInternalServerError).SendString("Error checking file: " + err.Error())
+    }
 
-	if !isFile {
-		return c.Status(404).SendString("File not found")
-	}
+    if !isFile {
+        return c.Status(http.StatusNotFound).SendString("File not found")
+    }
 
-	return c.Status(200).SendFile(filePath)
+    // Get the filename from the filePath
+    filename := filepath.Base(filePath)
+
+    // Set the Content-Disposition header to specify the filename
+    c.Set("Content-Disposition", "attachment; filename="+filename)
+
+    // Send the file as a response
+    return c.SendFile(filePath)
 }
 
 func handleCreateFolder(c *fiber.Ctx) error {
